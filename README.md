@@ -19,3 +19,9 @@ Find and click the button
 ![node-install](node-installer.png)
 
 ### Install ffmpeg
+
+Go to https://www.ffmpeg.org/download.html
+
+Find and click the button 
+
+![ffmpeg-install](ffmpeg-installer.png)
