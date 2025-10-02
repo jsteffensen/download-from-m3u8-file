@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "M3U8 URL Interceptor",
+  "version": "1.0",
+  "description": "Captures M3U8 playlist URLs",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,83 @@
+<html>
+<head>
+  <style>
+    body {
+      width: 600px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .quick-link {
+      display: inline-block;
+      background: #2196F3;
+      color: white;
+      padding: 8px 15px;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+    .quick-link:hover {
+      background: #0b7dda;
+    }
+    .url-item {
+      background: #f5f5f5;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border-left: 3px solid #4CAF50;
+    }
+    .url-text {
+      word-break: break-all;
+      font-size: 12px;
+      margin: 5px 0;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 11px;
+    }
+    .domain {
+      font-weight: bold;
+      color: #2196F3;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .clear-btn {
+      background: #f44336;
+    }
+    .clear-btn:hover {
+      background: #da190b;
+    }
+    #status {
+      color: #4CAF50;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>M3U8 Interceptor</h2>
+  
+  <a href="https://www.77hdfree.com/" target="_blank" class="quick-link">Open 77hdfree.com</a>
+  <a href="https://github.com/jsteffensen/download-from-m3u8-file" target="_blank" class="quick-link">Open GitHub project</a>
+  
+  <p>Captured second M3U8 requests:</p>
+  <button id="clearBadge">Clear Badge</button>
+  <button id="clearAll" class="clear-btn">Clear All</button>
+  <span id="status"></span>
+  <div id="urlList"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
