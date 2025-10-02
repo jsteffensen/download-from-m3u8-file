@@ -1,0 +1,22 @@
+{
+  "name": "m3u8-downloader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jsteffensen/m3u8-downloader.git"
+  },
+  "author": "jsteffensen",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jsteffensen/m3u8-downloader/issues"
+  },
+  "homepage": "https://github.com/jsteffensen/m3u8-downloader#readme",
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}
