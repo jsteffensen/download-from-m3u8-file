@@ -1,4 +1,4 @@
-# download-from-m3u8-file
+# Download movies by intercepting .m3u8 files and assemble locally
 Node.js script to download m3u8 segments and assemble with ffmpeg
 
 ## Prerequisites
