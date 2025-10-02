@@ -7,10 +7,10 @@ Node.js script to download m3u8 segments and assemble with ffmpeg
 * Install Node.js to run the download script.
 * Install ffmpeg to let the script assemble the downloaded segments into an .mp4 file.
 
-### Install Chrome Extension
+### How to Install Chrome Extension
 
 
-### Install Node.js
+### How to Install Node.js
 
 Go to https://nodejs.org/en/download
 
@@ -18,7 +18,7 @@ Find and click the button
 
 ![node-install](node-installer.png)
 
-### Install ffmpeg
+### How to Install ffmpeg
 
 Go to https://www.ffmpeg.org/download.html
 
