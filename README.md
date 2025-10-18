@@ -35,4 +35,8 @@ Find and click the button
 
 ### Run the script that downloads and assembles the segments
 
+Command ```node download.js <name of m3u8 file>```
+
+In this example ```node download.js superman```
+
 ![Demo](runscript.gif)
