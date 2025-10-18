@@ -31,9 +31,6 @@ Find and click the button
 
 ### Use the Chrome extension to get the m3u8 file
 
-<video width="100%" controls>
-  <source src="save-m3u8-file.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[Watch the demo](save-m3u8-file.mp4)
 
 ### Run the script that downloads and assembles the segments
