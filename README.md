@@ -31,6 +31,6 @@ Find and click the button
 
 ### Use the Chrome extension to get the m3u8 file
 
-[Watch the demo](save-m3u8-file.mp4)
+<video src="https://github.com/jsteffensen/download-from-m3u8-file/raw/refs/heads/main/save-m3u8-file.mp4" controls></video>
 
 ### Run the script that downloads and assembles the segments
