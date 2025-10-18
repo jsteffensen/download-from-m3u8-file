@@ -9,6 +9,9 @@ Node.js script to download m3u8 segments and assemble with ffmpeg
 
 ### How to Install Chrome Extension
 
+In the top right corner of the Chrome browser, find and click the puzzle-piece button
+
+![chrome-extension](chrome-extension.png)
 
 ### How to Install Node.js
 
