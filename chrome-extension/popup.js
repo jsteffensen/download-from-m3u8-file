@@ -14,7 +14,7 @@ function displayUrls() {
         <div class="url-text">${item.url}</div>
         <div class="timestamp">${item.timestamp}</div>
         <button class="copy-btn" data-url="${escapeHtml(item.url)}" data-index="${index}">Copy URL</button>
-        <button class="download-btn" data-url="${escapeHtml(item.url)}" data-index="${index}">Download M3U8</button>
+        <button class="download-btn" data-url="${escapeHtml(item.url)}" data-title="${escapeHtml(item.pageTitle || 'Untitled')}" data-index="${index}">Download M3U8</button>
       </div>
     `).join('');
     
@@ -27,7 +27,7 @@ function displayUrls() {
     
     document.querySelectorAll('.download-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        downloadUrl(this.getAttribute('data-url'));
+        downloadUrl(this.getAttribute('data-url'), this.getAttribute('data-title'));
       });
     });
   });
@@ -47,7 +47,35 @@ function copyUrl(url) {
   });
 }
 
-function downloadUrl(url) {
+function sanitizeFilename(title) {
+  // Trim whitespace at the beginning
+  title = title.trim();
+  
+  // Remove everything from "PMP Exam Prep" onwards
+  const pmpIndex = title.indexOf('PMP Exam Prep');
+  if (pmpIndex !== -1) {
+    title = title.substring(0, pmpIndex);
+  }
+  
+  // Remove colons and other invalid filename characters
+  // Invalid characters: < > : " / \ | ? *
+  let sanitized = title.replace(/[<>:"/\\|?*]/g, '');
+  
+  // Trim whitespace and limit length
+  sanitized = sanitized.trim();
+  if (sanitized.length > 100) {
+    sanitized = sanitized.substring(0, 100);
+  }
+  
+  // If empty after sanitization, use default
+  if (sanitized.length === 0) {
+    sanitized = 'playlist';
+  }
+  
+  return sanitized;
+}
+
+function downloadUrl(url, pageTitle) {
   // Try to fetch and download the M3U8 file
   fetch(url)
     .then(response => {
@@ -59,7 +87,11 @@ function downloadUrl(url) {
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `playlist_${Date.now()}.m3u8`;
+      
+      // Use sanitized page title as filename
+      const filename = sanitizeFilename(pageTitle || 'playlist');
+      a.download = `${filename}.m3u8`;
+      
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

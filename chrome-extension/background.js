@@ -15,6 +15,7 @@ chrome.webRequest.onBeforeRequest.addListener(
         }
         
         const pageUrl = tab.url;
+        const pageTitle = tab.title || 'Untitled';
         const trackingKey = `${pageUrl}_${details.tabId}`;
         
         // Initialize tracker for this page if needed
@@ -27,7 +28,8 @@ chrome.webRequest.onBeforeRequest.addListener(
           url: url,
           timestamp: Date.now(),
           tabId: details.tabId,
-          pageUrl: pageUrl
+          pageUrl: pageUrl,
+          pageTitle: pageTitle
         });
         
         console.log(`M3U8 Request #${tracker.length} for page ${pageUrl}:`, url);
@@ -42,6 +44,7 @@ chrome.webRequest.onBeforeRequest.addListener(
           const secondUrl = tracker[1].url;
           console.log('🎯 SECOND M3U8 URL CAPTURED:', secondUrl);
           console.log('   From page:', pageUrl);
+          console.log('   Page title:', pageTitle);
           
           // Save to storage
           chrome.storage.local.get(['capturedUrls'], (result) => {
@@ -49,6 +52,7 @@ chrome.webRequest.onBeforeRequest.addListener(
             urls.unshift({
               url: secondUrl,
               pageUrl: pageUrl,
+              pageTitle: pageTitle,
               timestamp: new Date().toISOString(),
               tabId: details.tabId
             });

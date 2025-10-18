@@ -2,97 +2,222 @@ const fs = require('fs');
 const fsp = fs.promises;
 const http = require('http');
 const https = require('https');
-const express = require('express');
 const path = require('path');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const readline = require('readline');
+const crypto = require('crypto');
+
+let express;
+try {
+  express = require('express');
+} catch (err) {
+  console.error('\n❌ Error: Required dependencies not installed.');
+  console.error('Please run: npm install\n');
+  console.error('After this you can run: node download\n');
+  process.exit(1);
+}
 
 const app = express();
 const port = 3000;
 const CONCURRENCY_LIMIT = 8;
-const fileNameInput = process.argv[2];
+const SEGMENTS_DIR = './segments/';
+const LOCAL_M3U8_PATH = './segments/local.m3u8';
 
 // state variables
 let segmentURLs;
+let fileNameInput;
 
-// Function to prompt the user
-function askQuestion(query) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+// Helper functions
+function getFileName(url) {
+  return url.split('/').pop();
+}
+
+function normalizeFileName(fileName) {
+  return fileName.replace('.html', '.ts').replace('.jpg', '.ts');
+}
+
+function getFilePath(fileName) {
+  return path.join(SEGMENTS_DIR, normalizeFileName(fileName));
+}
+
+async function getFileHash(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('md5');
+    const stream = fs.createReadStream(filePath);
+    
+    stream.on('data', (data) => hash.update(data));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
   });
+}
 
-  return new Promise((resolve) => rl.question(query, (ans) => {
-    rl.close();
-    resolve(ans.toLowerCase());
-  }));
+async function downloadToTemp(url) {
+  const proto = url.startsWith('https') ? https : http;
+  const tempPath = path.join(SEGMENTS_DIR, '.temp_compare');
+
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(tempPath);
+
+    const request = proto.get(url, response => {
+      if (response.statusCode !== 200) {
+        fs.unlink(tempPath, () => {
+          reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
+        });
+        return;
+      }
+
+      response.pipe(file);
+    });
+
+    file.on('finish', () => {
+      file.close();
+      resolve(tempPath);
+    });
+
+    request.on('error', err => {
+      fs.unlink(tempPath, () => reject(err));
+    });
+
+    file.on('error', err => {
+      fs.unlink(tempPath, () => reject(err));
+    });
+
+    request.end();
+  });
+}
+
+async function shouldClearSegments(firstUrl) {
+  try {
+    const fileName = getFileName(firstUrl);
+    const existingFilePath = getFilePath(fileName);
+    
+    // If file doesn't exist in segments, we need to clear and start fresh
+    if (!fs.existsSync(existingFilePath)) {
+      console.log('First segment not found in segments/. Will clear and download fresh.');
+      return true;
+    }
+    
+    // Download first file to temp location
+    console.log('Checking if existing segments match source...');
+    const tempPath = await downloadToTemp(firstUrl);
+    
+    // Compare hashes
+    const existingHash = await getFileHash(existingFilePath);
+    const newHash = await getFileHash(tempPath);
+    
+    // Clean up temp file
+    await fsp.unlink(tempPath);
+    
+    if (existingHash === newHash) {
+      console.log('Existing segments match source. Skipping already downloaded files.');
+      return false;
+    } else {
+      console.log('Existing segments differ from source. Will clear and download fresh.');
+      return true;
+    }
+    
+  } catch (error) {
+    console.error('Error checking segments:', error.message);
+    console.log('Will clear segments to be safe.');
+    return true;
+  }
+}
+
+async function findM3u8File() {
+  try {
+    const files = await fsp.readdir('./');
+    const m3u8Files = files.filter(file => 
+      file.endsWith('.m3u8') && !file.startsWith('local.')
+    );
+    
+    if (m3u8Files.length === 0) {
+      console.error('\nNo .m3u8 file found in the script directory.');
+      console.error('Please download and save an .m3u8 file in the same location as this script, using the Chrome extension.\n');
+      process.exit(1);
+    }
+    
+    if (m3u8Files.length > 1) {
+      console.error('\nMultiple .m3u8 files found:');
+      m3u8Files.forEach(file => console.error(`  - ${file}`));
+      console.error('\nPlease delete old files so only one .m3u8 file is present.\n');
+      process.exit(1);
+    }
+    
+    // Return filename without extension
+    const fileName = m3u8Files[0].replace('.m3u8', '');
+    console.log(`Using m3u8 file: ${m3u8Files[0]}\n`);
+    return fileName;
+    
+  } catch (error) {
+    console.error('Error reading directory:', error.message);
+    process.exit(1);
+  }
 }
 
 (async () => {
 
   if(!fsp) {
-	console.error('\nfs.promises is undefined.\nUsing Node ' + process.version + ' which may not support fs.promises.\nExiting process.\n');
-	process.exit(1);
+    console.error('\nfs.promises is undefined.\nUsing Node ' + process.version + ' which may not support fs.promises.\nExiting process.\n');
+    process.exit(1);
   }
   
-  const answerClear = await askQuestion('Do you want to clear segments? (y/n): ');
+  // Find the m3u8 file to use
+  fileNameInput = await findM3u8File();
   
-  if (answerClear === 'y') {
+  // Load URLs from m3u8 file first to check the first segment
+  const tempSegmentURLs = await getSegmentURLs(fileNameInput, true); // true = skip appending to local.m3u8
+  
+  if (tempSegmentURLs.length === 0) {
+    console.error('No segments found in m3u8 file.');
+    process.exit(1);
+  }
+  
+  // Automatically determine if we should clear segments
+  const needsToClear = await shouldClearSegments(tempSegmentURLs[0]);
+  
+  if (needsToClear) {
     await clearSegments();
-  } else {
-    console.log('Skipping segment clearing.');
   }
   
-  // make empty file
+  // Make empty file
   makeNewM3u8File();
 
-  // load URLs from m3u8 file
+  // Load URLs again and build local m3u8 file
   segmentURLs = await getSegmentURLs(fileNameInput);
 
-  // download
+  // Download
   await downloadSegmentsConcurrently(segmentURLs, CONCURRENCY_LIMIT);
 
-  const answerAssemble = await askQuestion('Do you want to assemble segments? (y/n): ');
+  console.log('\nDownload complete. Starting assembly...\n');
 
-  // finished download - now serve for VLC stream  
-  if (answerAssemble === 'y') {
+  // Automatically proceed to assembly
+  app.use(express.static('segments'));
 
-	  app.use(express.static('segments'));
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '/segments/local.m3u8'));
+  });
 
-	  app.get('/', (req, res) => {
-		res.sendFile(path.join(__dirname, '/segments/local.m3u8'));
-	  });
+  app.listen(port, () => {
+    console.log(`Media server listening on port ${port}`);
 
-	  app.listen(port, () => {
-		console.log(`media server listening on port ${port}`)
-
-		// assemble the segments
-		assembleToMP4(fileNameInput);
-	  });
-	
-	
-  } else {
-    console.log('Skipping segment assembly.\n\nIf you are have downloaded from 037HDMovie run stripBinaryStart script next.');
-  }
-
+    // Assemble the segments
+    assembleToMP4(fileNameInput);
+  });
 
 })();
 
 function makeNewM3u8File() {
-  const filePath = './segments/local.m3u8'
-  fs.closeSync(fs.openSync(filePath, 'w'))
+  fs.closeSync(fs.openSync(LOCAL_M3U8_PATH, 'w'));
 }
 
 async function clearSegments() {
   try {
-    // Read the directory
-    const files = await fsp.readdir('./segments/');
+    const files = await fsp.readdir(SEGMENTS_DIR);
 
-    // Loop through all files and delete them
     for (const file of files) {
-      if (file.indexOf('.js') < 0) {
-        const filePath = path.join('./segments/', file);
+      if (!file.endsWith('.js')) {
+        const filePath = path.join(SEGMENTS_DIR, file);
         await fsp.unlink(filePath);
       }
     }
@@ -103,28 +228,27 @@ async function clearSegments() {
   }
 }
 
-async function getSegmentURLs(fileNameInput) {
+async function getSegmentURLs(fileNameInput, skipAppend = false) {
   let m3u8TextString = await fsp.readFile('./' + fileNameInput + '.m3u8', 'utf8');
   
   m3u8TextString = m3u8TextString.trim();
   
   let segmentURLs = [];
   let linesArray = m3u8TextString.split(/\r?\n/);
-
-  let hasWarnedAboutUrlSeed = false;
   
   for (let i = 0; i < linesArray.length; i++) {
-
     const line = linesArray[i].trim();
     
     if(!line) {
-		continue;
-	}
+      continue;
+    }
 
-    // write local m3u8 file
-    await appendM3u8Line(line);
+    // Write local m3u8 file (unless we're just checking URLs)
+    if (!skipAppend) {
+      await appendM3u8Line(line);
+    }
 
-    if (line.indexOf('http') == 0) {
+    if (line.startsWith('http')) {
       segmentURLs.push(line);
     }
   }
@@ -134,30 +258,28 @@ async function getSegmentURLs(fileNameInput) {
 }
 
 async function appendM3u8Line(data) {
+  let modifiedData = data;
 
-  if (data.indexOf('http') == 0) {
-    let fileName = data.split('/')[(data.split('/').length - 1)];
-    data = 'http://localhost:3000/' + fileName;
-	data = data.replace('.html', '.ts');
-  } else if(data.indexOf('//cdn') == 0) {
-	let fileName = data.split('/')[(data.split('/').length - 1)];
-	fileName = fileName.replace('.jpg', '.ts');
-    data = 'http://localhost:3000/' + fileName;  
+  if (data.startsWith('http')) {
+    const fileName = getFileName(data);
+    modifiedData = 'http://localhost:3000/' + normalizeFileName(fileName);
+  } else if(data.startsWith('//cdn')) {
+    const fileName = getFileName(data);
+    modifiedData = 'http://localhost:3000/' + normalizeFileName(fileName);
   }
 
-  await fsp.appendFile('./segments/local.m3u8', data + '\n', function (err) {
-    if (err) {
-      console.log(err);
-    }
-  });
+  try {
+    await fsp.appendFile(LOCAL_M3U8_PATH, modifiedData + '\n');
+  } catch (err) {
+    console.error('Error appending to m3u8:', err);
+  }
 }
 
 async function download(url, percent) {
-  const proto = !url.charAt(4).localeCompare('s') ? https : http;
+  const proto = url.startsWith('https') ? https : http;
 
-  let fileName = url.split('/')[(url.split('/').length - 1)];
-  fileName = fileName.replace('.html', '.ts');
-  let filePath = './segments/' + fileName;
+  const fileName = getFileName(url);
+  const filePath = getFilePath(fileName);
   
   // Check if the file already exists
   if (fs.existsSync(filePath)) {
@@ -185,7 +307,6 @@ async function download(url, percent) {
       response.pipe(file);
     });
 
-    // The destination stream is ended by the time it's called
     file.on('finish', () => {
       console.log(url + ' ' + percent);
       resolve(fileInfo);
@@ -204,14 +325,15 @@ async function download(url, percent) {
 }
 
 async function downloadSegmentsConcurrently(urls, limit) {
-  const downloadPromises = [];
+  let downloadPromises = [];
+  
   for (let i = 0; i < urls.length; i++) {
-    let progress = Math.floor((i / urls.length) * 100) + '%';
+    const progress = Math.floor((i / urls.length) * 100) + '%';
     downloadPromises.push(download(urls[i], progress));
 
     if (downloadPromises.length >= limit) {
       await Promise.all(downloadPromises);
-      downloadPromises.length = 0; // Clear the array to allow new concurrent downloads
+      downloadPromises = [];
     }
   }
 
@@ -226,9 +348,9 @@ async function assembleToMP4(fileNameInput) {
     const { stdout, stderr } = await exec('ffmpeg -i http://localhost:3000 -c copy -bsf:a aac_adtstoasc ' + fileNameInput + '.mp4');
     console.log('stdout:', stdout);
     console.log('stderr:', stderr);
-	
-	process.exit(0);
-	
+    
+    process.exit(0);
+    
   } catch (e) {
     console.error(e);
   }

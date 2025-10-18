@@ -25,3 +25,12 @@ Go to https://www.ffmpeg.org/download.html
 Find and click the button 
 
 ![ffmpeg-install](ffmpeg-installer.png)
+
+### Use the Chrome extension to get the m3u8 file
+
+<video width="100%" controls>
+  <source src="save-m3u8-file.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+### Run the script that downloads and assembles the segments
