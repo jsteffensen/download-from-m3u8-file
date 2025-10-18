@@ -34,3 +34,5 @@ Find and click the button
  ![Demo](save-m3u8-file.gif)
 
 ### Run the script that downloads and assembles the segments
+
+![Demo](runscript.gif)
